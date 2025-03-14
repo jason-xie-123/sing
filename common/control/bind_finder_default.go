@@ -47,15 +47,23 @@ func (f *DefaultInterfaceFinder) UpdateInterfaces(interfaces []Interface) {
 }
 
 func (f *DefaultInterfaceFinder) Interfaces() []Interface {
-	return f.interfaces
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var interfaces []Interface
+	interfaces = append(interfaces, f.interfaces...)
+	return interfaces
 }
 
 func (f *DefaultInterfaceFinder) ByName(name string) (*Interface, error) {
+	f.mu.Lock()
 	for _, netInterface := range f.interfaces {
 		if netInterface.Name == name {
+			defer f.mu.Unlock()
 			return &netInterface, nil
 		}
 	}
+	defer f.mu.Unlock()
+
 	_, err := net.InterfaceByName(name)
 	if err == nil {
 		err = f.Update()
@@ -68,11 +76,15 @@ func (f *DefaultInterfaceFinder) ByName(name string) (*Interface, error) {
 }
 
 func (f *DefaultInterfaceFinder) ByIndex(index int) (*Interface, error) {
+	f.mu.Lock()
 	for _, netInterface := range f.interfaces {
 		if netInterface.Index == index {
+			f.mu.Unlock()
 			return &netInterface, nil
 		}
 	}
+	f.mu.Unlock()
+
 	_, err := net.InterfaceByIndex(index)
 	if err == nil {
 		err = f.Update()
@@ -85,12 +97,16 @@ func (f *DefaultInterfaceFinder) ByIndex(index int) (*Interface, error) {
 }
 
 func (f *DefaultInterfaceFinder) ByAddr(addr netip.Addr) (*Interface, error) {
+	f.mu.Lock()
 	for _, netInterface := range f.interfaces {
 		for _, prefix := range netInterface.Addresses {
 			if prefix.Contains(addr) {
+				f.mu.Unlock()
 				return &netInterface, nil
 			}
 		}
 	}
+	f.mu.Unlock()
+
 	return nil, &net.OpError{Op: "route", Net: "ip+net", Source: nil, Addr: &net.IPAddr{IP: addr.AsSlice()}, Err: E.New("no such network interface")}
 }
