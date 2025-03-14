@@ -3,6 +3,7 @@ package control
 import (
 	"net"
 	"net/netip"
+	"sync"
 
 	E "github.com/sagernet/sing/common/exceptions"
 )
@@ -10,6 +11,8 @@ import (
 var _ InterfaceFinder = (*DefaultInterfaceFinder)(nil)
 
 type DefaultInterfaceFinder struct {
+	mu sync.Mutex
+
 	interfaces []Interface
 }
 
@@ -31,11 +34,15 @@ func (f *DefaultInterfaceFinder) Update() error {
 		}
 		interfaces = append(interfaces, iif)
 	}
+	f.mu.Lock()
 	f.interfaces = interfaces
+	f.mu.Unlock()
 	return nil
 }
 
 func (f *DefaultInterfaceFinder) UpdateInterfaces(interfaces []Interface) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.interfaces = interfaces
 }
 
