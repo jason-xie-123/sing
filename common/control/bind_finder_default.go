@@ -11,7 +11,7 @@ import (
 var _ InterfaceFinder = (*DefaultInterfaceFinder)(nil)
 
 type DefaultInterfaceFinder struct {
-	mu sync.Mutex
+	interfacesAccess sync.Mutex
 
 	interfaces []Interface
 }
@@ -34,35 +34,35 @@ func (f *DefaultInterfaceFinder) Update() error {
 		}
 		interfaces = append(interfaces, iif)
 	}
-	f.mu.Lock()
+	f.interfacesAccess.Lock()
 	f.interfaces = interfaces
-	f.mu.Unlock()
+	f.interfacesAccess.Unlock()
 	return nil
 }
 
 func (f *DefaultInterfaceFinder) UpdateInterfaces(interfaces []Interface) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+	f.interfacesAccess.Lock()
+	defer f.interfacesAccess.Unlock()
 	f.interfaces = interfaces
 }
 
 func (f *DefaultInterfaceFinder) Interfaces() []Interface {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+	f.interfacesAccess.Lock()
+	defer f.interfacesAccess.Unlock()
 	var interfaces []Interface
 	interfaces = append(interfaces, f.interfaces...)
 	return interfaces
 }
 
 func (f *DefaultInterfaceFinder) ByName(name string) (*Interface, error) {
-	f.mu.Lock()
+	f.interfacesAccess.Lock()
 	for _, netInterface := range f.interfaces {
 		if netInterface.Name == name {
-			defer f.mu.Unlock()
+			defer f.interfacesAccess.Unlock()
 			return &netInterface, nil
 		}
 	}
-	defer f.mu.Unlock()
+	defer f.interfacesAccess.Unlock()
 
 	_, err := net.InterfaceByName(name)
 	if err == nil {
@@ -76,14 +76,14 @@ func (f *DefaultInterfaceFinder) ByName(name string) (*Interface, error) {
 }
 
 func (f *DefaultInterfaceFinder) ByIndex(index int) (*Interface, error) {
-	f.mu.Lock()
+	f.interfacesAccess.Lock()
 	for _, netInterface := range f.interfaces {
 		if netInterface.Index == index {
-			f.mu.Unlock()
+			f.interfacesAccess.Unlock()
 			return &netInterface, nil
 		}
 	}
-	f.mu.Unlock()
+	f.interfacesAccess.Unlock()
 
 	_, err := net.InterfaceByIndex(index)
 	if err == nil {
@@ -97,16 +97,16 @@ func (f *DefaultInterfaceFinder) ByIndex(index int) (*Interface, error) {
 }
 
 func (f *DefaultInterfaceFinder) ByAddr(addr netip.Addr) (*Interface, error) {
-	f.mu.Lock()
+	f.interfacesAccess.Lock()
 	for _, netInterface := range f.interfaces {
 		for _, prefix := range netInterface.Addresses {
 			if prefix.Contains(addr) {
-				f.mu.Unlock()
+				f.interfacesAccess.Unlock()
 				return &netInterface, nil
 			}
 		}
 	}
-	f.mu.Unlock()
+	f.interfacesAccess.Unlock()
 
 	return nil, &net.OpError{Op: "route", Net: "ip+net", Source: nil, Addr: &net.IPAddr{IP: addr.AsSlice()}, Err: E.New("no such network interface")}
 }
